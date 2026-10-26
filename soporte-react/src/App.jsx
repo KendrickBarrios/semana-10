@@ -7,7 +7,6 @@ function App() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
-  // filtros por prioridad y estado
   const [filtroPrioridad, setFiltroPrioridad] = useState('TODAS')
   const [filtroEstado, setFiltroEstado] = useState('TODOS')
 
@@ -35,6 +34,38 @@ function App() {
     return () => controller.abort()
   }, [])
 
+  // calculo de porcentajes
+  const estadisticas = useMemo(() => {
+    const total = solicitudes.length
+
+    // manejo de lista vacia
+    if (total === 0) {
+      return {
+        total: 0,
+        porEstado: []
+      }
+    }
+
+    // agrupacion por estado
+    const conteos = solicitudes.reduce((acc, item) => {
+      const estado = item.estado || 'Sin estado'
+      acc[estado] = (acc[estado] || 0) + 1
+      return acc
+    }, {})
+
+    // conversion a arreglo
+    const porEstado = Object.entries(conteos).map(([estado, cantidad]) => {
+      const porcentaje = total > 0 ? (cantidad / total) * 100 : 0
+      return {
+        estado,
+        cantidad,
+        porcentaje: porcentaje.toFixed(1) // 1 decimal (ej: "33.3")
+      }
+    })
+
+    return { total, porEstado }
+  }, [solicitudes])
+
   // filtrado
   const solicitudesFiltradas = useMemo(() => {
     return solicitudes.filter(item => {
@@ -50,6 +81,25 @@ function App() {
   return (
       <main>
         <h1>Solicitudes desde Spring Boot</h1>
+
+        {!cargando && !error && (
+            <section style={{ background: '#f4f4f4', padding: '1rem', borderRadius: '8px', margin: '1rem 0' }}>
+              <h2>Resumen general</h2>
+              <p><strong>Total de solicitudes:</strong> {estadisticas.total}</p>
+
+              {estadisticas.total === 0 ? (
+                  <p>No hay datos suficientes para calcular porcentajes.</p>
+              ) : (
+                  <ul>
+                    {estadisticas.porEstado.map(({ estado, cantidad, porcentaje }) => (
+                        <li key={estado}>
+                          <strong>{estado}:</strong> {cantidad} ({porcentaje}%)
+                        </li>
+                    ))}
+                  </ul>
+              )}
+            </section>
+        )}
 
         <section style={{ display: 'flex', gap: '1rem', margin: '1rem 0' }}>
           <div>
@@ -81,29 +131,13 @@ function App() {
               <option value="Resuelta">Resuelta</option>
             </select>
           </div>
-
-          {(filtroPrioridad !== 'TODAS' || filtroEstado !== 'TODOS') && (
-              <button
-                  type="button"
-                  onClick={() => {
-                    setFiltroPrioridad('TODAS')
-                    setFiltroEstado('TODOS')
-                  }}
-              >
-                Limpiar filtros
-              </button>
-          )}
         </section>
 
         {cargando && <p role="status">Cargando solicitudes...</p>}
         {error && <p role="alert">{error}</p>}
 
-        {!cargando && !error && solicitudes.length === 0 && (
-            <p>No hay solicitudes registradas.</p>
-        )}
-
-        {!cargando && !error && solicitudes.length > 0 && solicitudesFiltradas.length === 0 && (
-            <p>No se encontraron solicitudes que coincidan con los filtros seleccionados.</p>
+        {!cargando && !error && solicitudesFiltradas.length === 0 && (
+            <p>No hay solicitudes que coincidan con los criterios.</p>
         )}
 
         {!cargando && !error && solicitudesFiltradas.map(s => (
