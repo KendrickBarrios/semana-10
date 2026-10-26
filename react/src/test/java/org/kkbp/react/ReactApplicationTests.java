@@ -1,10 +1,10 @@
-package org.kkbp.practica_react;
+package org.kkbp.react;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class PracticaReactApplicationTests {
+class ReactApplicationTests {
 
 	@Test
 	void contextLoads() {

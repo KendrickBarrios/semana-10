@@ -1,13 +1,13 @@
-package org.kkbp.practica_react;
+package org.kkbp.react;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class PracticaReactApplication {
+public class ReactApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(PracticaReactApplication.class, args);
+		SpringApplication.run(ReactApplication.class, args);
 	}
 
 }
