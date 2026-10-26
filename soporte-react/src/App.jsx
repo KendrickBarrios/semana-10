@@ -1,62 +1,114 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { api } from './services/api'
 import SolicitudCard from './components/SolicitudCard'
 
-const iniciales = [
-  { id: 1, titulo: 'Equipo no enciende', prioridad: 'Alta', estado: 'Pendiente' },
-  { id: 2, titulo: 'Instalar software', prioridad: 'Media', estado: 'En proceso' }
-]
-
 function App() {
-  const [solicitudes, setSolicitudes] = useState(iniciales)
-  const [titulo, setTitulo] = useState('')
-  const [prioridad, setPrioridad] = useState('Media')
-  const [filtro, setFiltro] = useState('Todas')
-  const [mensaje, setMensaje] = useState('')
+  const [solicitudes, setSolicitudes] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
 
-  function agregar(e) {
-    e.preventDefault()
-    if (!titulo.trim()) {
-      setMensaje('Escribe una descripción de la solicitud.')
-      return
-    }
-    const nueva = {
-      id: crypto.randomUUID(),
-      titulo: titulo.trim(),
-      prioridad,
-      estado: 'Pendiente'
-    }
-    setSolicitudes(actuales => [...actuales, nueva])
-    setTitulo('')
-    setMensaje('Solicitud agregada correctamente.')
-  }
+  // filtros por prioridad y estado
+  const [filtroPrioridad, setFiltroPrioridad] = useState('TODAS')
+  const [filtroEstado, setFiltroEstado] = useState('TODOS')
 
-  const visibles = solicitudes.filter(s =>
-      filtro === 'Todas' || s.estado === filtro
-  )
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function cargar() {
+      try {
+        setCargando(true)
+        setError('')
+        const respuesta = await api.get('/solicitudes', {
+          signal: controller.signal
+        })
+        setSolicitudes(respuesta.data)
+      } catch (err) {
+        if (err.code !== 'ERR_CANCELED') {
+          setError('No fue posible consultar las solicitudes.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setCargando(false)
+      }
+    }
+
+    cargar()
+    return () => controller.abort()
+  }, [])
+
+  // filtrado
+  const solicitudesFiltradas = useMemo(() => {
+    return solicitudes.filter(item => {
+      const coincidePrioridad =
+          filtroPrioridad === 'TODAS' || item.prioridad === filtroPrioridad
+      const coincideEstado =
+          filtroEstado === 'TODOS' || item.estado === filtroEstado
+
+      return coincidePrioridad && coincideEstado
+    })
+  }, [solicitudes, filtroPrioridad, filtroEstado])
 
   return (
       <main>
-        <h1>Sistema de Soporte Técnico</h1>
-        <p>Total registradas: {solicitudes.length}</p>
-        <form onSubmit={agregar}>
-          <label htmlFor="titulo">Descripción</label>
-          <input id="titulo" value={titulo} onChange={e => setPrioridad(e.target.value)} />
-          <label htmlFor="prioridad">Prioridad</label>
-          <select id="prioridad" value={prioridad} onChange={e => setPrioridad(e.target.value)}>
-            <option>Alta</option><option>Media</option><option>Baja</option>
-          </select>
-        </form>
-        <p role="status">{mensaje}</p>
-        <label htmlFor="filtro">Filtrar por estado</label>
-        <select id="filtro" value={filtro} onChange={e => setFiltro(e.target.value)}>
-          <option>Todas</option>
-          <option>Pendiente</option>
-          <option>En proceso</option>
-          <option>Resuelta</option>
-        </select>
-        {visibles.length === 0 ? <p>No hay resultados.</p> :
-            visibles.map(s => <SolicitudCard key={s.id} {...s} />)
-        }
+        <h1>Solicitudes desde Spring Boot</h1>
+
+        <section style={{ display: 'flex', gap: '1rem', margin: '1rem 0' }}>
+          <div>
+            <label htmlFor="filtro-prioridad">Prioridad: </label>
+            <select
+                id="filtro-prioridad"
+                value={filtroPrioridad}
+                onChange={e => setFiltroPrioridad(e.target.value)}
+                disabled={cargando || Boolean(error)}
+            >
+              <option value="TODAS">Todas</option>
+              <option value="Alta">Alta</option>
+              <option value="Media">Media</option>
+              <option value="Baja">Baja</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="filtro-estado">Estado: </label>
+            <select
+                id="filtro-estado"
+                value={filtroEstado}
+                onChange={e => setFiltroEstado(e.target.value)}
+                disabled={cargando || Boolean(error)}
+            >
+              <option value="TODOS">Todos</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="En Proceso">En Proceso</option>
+              <option value="Resuelta">Resuelta</option>
+            </select>
+          </div>
+
+          {(filtroPrioridad !== 'TODAS' || filtroEstado !== 'TODOS') && (
+              <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroPrioridad('TODAS')
+                    setFiltroEstado('TODOS')
+                  }}
+              >
+                Limpiar filtros
+              </button>
+          )}
+        </section>
+
+        {cargando && <p role="status">Cargando solicitudes...</p>}
+        {error && <p role="alert">{error}</p>}
+
+        {!cargando && !error && solicitudes.length === 0 && (
+            <p>No hay solicitudes registradas.</p>
+        )}
+
+        {!cargando && !error && solicitudes.length > 0 && solicitudesFiltradas.length === 0 && (
+            <p>No se encontraron solicitudes que coincidan con los filtros seleccionados.</p>
+        )}
+
+        {!cargando && !error && solicitudesFiltradas.map(s => (
+            <SolicitudCard key={s.id} {...s} />
+        ))}
       </main>
   )
 }
